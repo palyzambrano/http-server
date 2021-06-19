@@ -1,19 +1,9 @@
 use anyhow::{Context, Result};
 use chrono::{DateTime, Local, Utc};
-use futures::Stream;
 use http::response::Builder as HttpResponseBuilder;
 use hyper::body::Body;
-use hyper::body::Bytes;
-use std::mem::MaybeUninit;
-use std::pin::Pin;
-use std::task::{self, Poll};
-use tokio::io::{AsyncRead, ReadBuf};
 
-use super::file::File;
-
-const FILE_BUFFER_SIZE: usize = 8 * 1024;
-
-pub type FileBuffer = Box<[MaybeUninit<u8>; FILE_BUFFER_SIZE]>;
+use super::file::{ByteStream, File};
 
 /// HTTP Response `Cache-Control` directive
 ///
@@ -129,41 +119,7 @@ pub async fn make_http_file_response(
 }
 
 pub async fn file_bytes_into_http_body(file: File) -> Body {
-    let byte_stream = ByteStream {
-        file: file.file,
-        buffer: Box::new([MaybeUninit::uninit(); FILE_BUFFER_SIZE]),
-    };
+    let byte_stream = ByteStream::from(file);
 
     Body::wrap_stream(byte_stream)
-}
-
-pub struct ByteStream {
-    file: tokio::fs::File,
-    buffer: FileBuffer,
-}
-
-impl Stream for ByteStream {
-    type Item = Result<Bytes>;
-
-    fn poll_next(mut self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Option<Self::Item>> {
-        let ByteStream {
-            ref mut file,
-            ref mut buffer,
-        } = *self;
-        let mut read_buffer = ReadBuf::uninit(&mut buffer[..]);
-
-        match Pin::new(file).poll_read(cx, &mut read_buffer) {
-            Poll::Ready(Ok(())) => {
-                let filled = read_buffer.filled();
-
-                if filled.is_empty() {
-                    Poll::Ready(None)
-                } else {
-                    Poll::Ready(Some(Ok(Bytes::copy_from_slice(filled))))
-                }
-            }
-            Poll::Ready(Err(error)) => Poll::Ready(Some(Err(error.into()))),
-            Poll::Pending => Poll::Pending,
-        }
-    }
 }
