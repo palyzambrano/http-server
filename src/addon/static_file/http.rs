@@ -3,6 +3,8 @@ use chrono::{DateTime, Local, Utc};
 use http::response::Builder as HttpResponseBuilder;
 use hyper::body::Body;
 
+use crate::utils::compression::gzip;
+
 use super::file::{ByteStream, File};
 
 /// HTTP Response `Cache-Control` directive
@@ -110,7 +112,8 @@ pub async fn make_http_file_response(
         .header(http::header::ETAG, headers.etag)
         .header(http::header::LAST_MODIFIED, headers.last_modified);
 
-    let body = file_bytes_into_http_body(file).await;
+    let byte_stream = ByteStream::from(file);
+    let body = Body::wrap_stream(byte_stream);
     let response = builder
         .body(body)
         .context("Failed to build HTTP File Response")?;
@@ -118,8 +121,26 @@ pub async fn make_http_file_response(
     Ok(response)
 }
 
-pub async fn file_bytes_into_http_body(file: File) -> Body {
-    let byte_stream = ByteStream::from(file);
+pub async fn make_gzip_compressed_http_file_response(
+    file: File,
+    cache_control_directive: CacheControlDirective,
+) -> Result<hyper::http::Response<Body>> {
+    let headers = ResponseHeaders::new(&file, cache_control_directive)?;
+    let file_bytes = file.bytes();
+    let compressed = gzip(&file_bytes)?;
+    let content_length = compressed.len();
+    let builder = HttpResponseBuilder::new()
+        .header(http::header::CONTENT_ENCODING, "gzip")
+        .header(http::header::CONTENT_LENGTH, content_length)
+        .header(http::header::CACHE_CONTROL, headers.cache_control)
+        .header(http::header::CONTENT_TYPE, headers.content_type)
+        .header(http::header::ETAG, headers.etag)
+        .header(http::header::LAST_MODIFIED, headers.last_modified);
 
-    Body::wrap_stream(byte_stream)
+    let body = Body::from(compressed);
+    let response = builder
+        .body(body)
+        .context("Failed to build HTTP File Response")?;
+
+    Ok(response)
 }

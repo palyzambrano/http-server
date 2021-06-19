@@ -3,7 +3,7 @@ use compression::prelude::{Action, CompressionError, EncodeExt, GZipEncoder};
 
 pub fn gzip(bytes: &[u8]) -> Result<Vec<u8>> {
     bytes
-        .into_iter()
+        .iter()
         .cloned()
         .encode(&mut GZipEncoder::new(), Action::Finish)
         .collect::<Result<Vec<u8>, CompressionError>>()
