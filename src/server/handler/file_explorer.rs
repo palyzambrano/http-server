@@ -12,9 +12,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::SystemTime;
 
-use crate::addon::static_file::http::{
-    make_gzip_compressed_http_file_response, make_http_file_response, CacheControlDirective,
-};
+use crate::addon::static_file::http::{make_http_file_response, CacheControlDirective};
 use crate::addon::static_file::{Entry, ScopedFileSystem};
 use crate::server::middleware::Handler;
 
@@ -194,11 +192,7 @@ impl<'a> FileExplorer {
             return match entry {
                 Entry::Directory(dir) => self.render_directory_index(dir.path()).await,
                 Entry::File(file) => {
-                    make_gzip_compressed_http_file_response(
-                        file,
-                        CacheControlDirective::MaxAge(2500),
-                    )
-                    .await
+                    make_http_file_response(file, CacheControlDirective::MaxAge(2500)).await
                 }
             };
         }

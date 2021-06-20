@@ -1,7 +1,14 @@
-use http::Response;
+use http::response::Builder;
+use http::{HeaderValue, Request, Response};
+use hyper::body::aggregate;
+use hyper::body::Buf;
 use hyper::Body;
+use std::mem;
 use std::sync::Arc;
 use tokio::sync::Mutex;
+
+use crate::addon::static_file::FILE_BUFFER_SIZE;
+use crate::utils::compression::gzip;
 
 use super::MiddlewareAfter;
 
@@ -20,13 +27,35 @@ use super::MiddlewareAfter;
 ///
 /// Also panics if any CORS header value is not a valid UTF-8 string
 pub fn make_gzip_compression_middleware() -> MiddlewareAfter {
-    Box::new(move |_: _, response: Arc<Mutex<Response<Body>>>| {
-        Box::pin(async move {
-            let mut response = response.lock().await;
+    Box::new(
+        move |request: Arc<Request<Body>>, response: Arc<Mutex<Response<Body>>>| {
+            Box::pin(async move {
+                if let Some(accept_encoding_header) =
+                    request.headers().get(http::header::ACCEPT_ENCODING)
+                {
+                    if let Some(_) = accept_encoding_header
+                        .to_str()
+                        .unwrap()
+                        .split(", ")
+                        .into_iter()
+                        .find(|encoding| *encoding == "gzip")
+                    {
+                        let mut response = response.lock().await;
+                        let body = response.body_mut();
+                        let mut bytes = aggregate(body).await.unwrap();
+                        let mut buf: [u8; FILE_BUFFER_SIZE] = [0; FILE_BUFFER_SIZE];
 
-            *response.body_mut() = Body::empty();
+                        bytes.copy_to_slice(&mut buf);
 
-            Ok(())
-        })
-    })
+                        let buf = buf.to_vec();
+                        let compressed = gzip(&buf)?;
+
+                        // *response.body_mut() = Body::from(compressed);
+                    }
+                }
+
+                Ok(())
+            })
+        },
+    )
 }

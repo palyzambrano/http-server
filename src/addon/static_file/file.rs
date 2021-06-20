@@ -10,7 +10,7 @@ use std::pin::Pin;
 use std::task::{self, Poll};
 use tokio::io::{AsyncRead, ReadBuf};
 
-const FILE_BUFFER_SIZE: usize = 8 * 1024;
+pub const FILE_BUFFER_SIZE: usize = 8 * 1024;
 
 pub type FileBuffer = Box<[MaybeUninit<u8>; FILE_BUFFER_SIZE]>;
 

@@ -120,27 +120,3 @@ pub async fn make_http_file_response(
 
     Ok(response)
 }
-
-pub async fn make_gzip_compressed_http_file_response(
-    file: File,
-    cache_control_directive: CacheControlDirective,
-) -> Result<hyper::http::Response<Body>> {
-    let headers = ResponseHeaders::new(&file, cache_control_directive)?;
-    let file_bytes = file.bytes();
-    let compressed = gzip(&file_bytes)?;
-    let content_length = compressed.len();
-    let builder = HttpResponseBuilder::new()
-        .header(http::header::CONTENT_ENCODING, "gzip")
-        .header(http::header::CONTENT_LENGTH, content_length)
-        .header(http::header::CACHE_CONTROL, headers.cache_control)
-        .header(http::header::CONTENT_TYPE, headers.content_type)
-        .header(http::header::ETAG, headers.etag)
-        .header(http::header::LAST_MODIFIED, headers.last_modified);
-
-    let body = Body::from(compressed);
-    let response = builder
-        .body(body)
-        .context("Failed to build HTTP File Response")?;
-
-    Ok(response)
-}
