@@ -1,4 +1,5 @@
 pub mod cors;
+pub mod gzip_compression;
 
 use anyhow::{Error, Result};
 use futures::Future;
@@ -12,6 +13,7 @@ use tokio::sync::Mutex;
 use crate::config::Config;
 
 use self::cors::make_cors_middleware;
+use self::gzip_compression::make_gzip_compression_middleware;
 
 pub type MiddlewareBefore = Box<dyn Fn(&mut Request<Body>) + Send + Sync>;
 pub type MiddlewareAfter = Box<
@@ -94,6 +96,8 @@ impl TryFrom<Arc<Config>> for Middleware {
 
             middleware.after(cors_middleware);
         }
+
+        middleware.after(make_gzip_compression_middleware());
 
         Ok(middleware)
     }
