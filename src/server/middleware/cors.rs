@@ -1,4 +1,5 @@
-use hyper::{Body, Response};
+use http::Response;
+use hyper::Body;
 use std::convert::TryFrom;
 use std::sync::Arc;
 use tokio::sync::Mutex;

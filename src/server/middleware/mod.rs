@@ -2,7 +2,8 @@ pub mod cors;
 
 use anyhow::{Error, Result};
 use futures::Future;
-use hyper::{Body, Request, Response};
+use http::{Request, Response};
+use hyper::Body;
 use std::convert::TryFrom;
 use std::pin::Pin;
 use std::sync::Arc;
