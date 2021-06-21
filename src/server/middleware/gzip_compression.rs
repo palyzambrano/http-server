@@ -40,17 +40,31 @@ pub fn make_gzip_compression_middleware() -> MiddlewareAfter {
                         .into_iter()
                         .find(|encoding| *encoding == "gzip")
                     {
-                        let mut response = response.lock().await;
-                        let body = response.body_mut();
-                        let mut bytes = aggregate(body).await.unwrap();
                         let mut buf: [u8; FILE_BUFFER_SIZE] = [0; FILE_BUFFER_SIZE];
 
-                        bytes.copy_to_slice(&mut buf);
+                        {
+                            let mut response = response.lock().await;
+                            let body = response.body_mut();
+                            let mut bytes = aggregate(body).await.unwrap();
+
+                            bytes.copy_to_slice(&mut buf);
+                        }
 
                         let buf = buf.to_vec();
                         let compressed = gzip(&buf)?;
+                        let mut response = response.lock().await;
+                        let response_headers = response.headers_mut();
 
-                        // *response.body_mut() = Body::from(compressed);
+                        response_headers.append(
+                            http::header::CONTENT_ENCODING,
+                            HeaderValue::from_str("gzip").unwrap(),
+                        );
+                        response_headers.append(
+                            http::header::CONTENT_LENGTH,
+                            HeaderValue::from(compressed.len()),
+                        );
+
+                        *response.body_mut() = Body::from(compressed);
                     }
                 }
 
