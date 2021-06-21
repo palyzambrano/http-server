@@ -40,18 +40,19 @@ pub fn make_gzip_compression_middleware() -> MiddlewareAfter {
                         .into_iter()
                         .find(|encoding| *encoding == "gzip")
                     {
-                        let mut buf: [u8; FILE_BUFFER_SIZE] = [0; FILE_BUFFER_SIZE];
+                        let mut buffer: Vec<u8> = Vec::new();
 
                         {
                             let mut response = response.lock().await;
                             let body = response.body_mut();
-                            let mut bytes = aggregate(body).await.unwrap();
+                            let mut buffer_cursor = aggregate(body).await.unwrap();
 
-                            bytes.copy_to_slice(&mut buf);
+                            while buffer_cursor.has_remaining() {
+                                buffer.push(buffer_cursor.get_u8());
+                            }
                         }
 
-                        let buf = buf.to_vec();
-                        let compressed = gzip(&buf)?;
+                        let compressed = gzip(&buffer)?;
                         let mut response = response.lock().await;
                         let response_headers = response.headers_mut();
 
@@ -59,10 +60,14 @@ pub fn make_gzip_compression_middleware() -> MiddlewareAfter {
                             http::header::CONTENT_ENCODING,
                             HeaderValue::from_str("gzip").unwrap(),
                         );
-                        response_headers.append(
-                            http::header::CONTENT_LENGTH,
-                            HeaderValue::from(compressed.len()),
-                        );
+
+                        response_headers.remove(http::header::CONTENT_LENGTH);
+
+                        println!("Response Size: {}", compressed.len());
+                        // response_headers.append(
+                        //     http::header::CONTENT_LENGTH,
+                        //     HeaderValue::from(compressed.len()),
+                        // );
 
                         *response.body_mut() = Body::from(compressed);
                     }
